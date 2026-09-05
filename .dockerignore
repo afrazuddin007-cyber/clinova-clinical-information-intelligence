@@ -1,0 +1,28 @@
+﻿# Git
+.git
+.gitignore
+
+# Environment & local secrets
+.env
+.env.*
+!*.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+venv/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+frontend/node_modules/
+node_modules/
+
+# Local databases & uploads
+*.db-shm
+*.db-wal
+backend/uploads/*
+!backend/uploads/.gitkeep

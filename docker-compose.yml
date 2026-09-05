@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  clinova:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - JWT_SECRET=clinova_secure_production_secret_2026
+      - DATABASE_URL=sqlite:///./clinova.db
+    volumes:
+      - clinova_data:/app/backend/uploads
+    restart: unless-stopped
+
+volumes:
+  clinova_data:
