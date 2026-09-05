@@ -15,13 +15,13 @@ class Settings(BaseSettings):
     PORT: int = 8080
 
     # Security
-    JWT_SECRET: str = "clinova_clinical_intelligence_secure_jwt_secret_key_2026"
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "clinova_clinical_intelligence_secure_jwt_secret_key_2026")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours for clinical workflows
 
-    # AI Configuration
-    GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    # AI Configuration (strictly server-side environment variable)
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     # Database
     DATABASE_URL: str = f"sqlite:///{BASE_DIR}/clinova.db"

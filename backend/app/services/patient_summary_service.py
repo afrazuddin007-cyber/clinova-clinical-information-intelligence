@@ -1,7 +1,10 @@
 import os
+import logging
 from sqlalchemy.orm import Session
 from google import genai
 from google.genai import types
+
+logger = logging.getLogger("clinova.summary")
 from ..core.config import settings
 from ..models.db_models import Patient, MedicalReport, ExtractedLabResult, ExtractedClinicalEntity
 from ..models.schemas import PatientSummaryResponse
@@ -103,7 +106,7 @@ def generate_patient_summary(patient_id: str, db: Session) -> PatientSummaryResp
                     disclaimer=SUMMARY_DISCLAIMER
                 )
         except Exception as e:
-            print(f"[Clinova Summary] Gemini call error: {e}")
+            logger.warning(f"[Clinova Summary] Gemini call error: {e}")
 
     # Deterministic factual fallback summary
     summary_parts = [

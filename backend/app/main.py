@@ -1,6 +1,8 @@
 import os
+import logging
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -10,17 +12,25 @@ from .core.security import get_password_hash
 from .models.db_models import User
 from .api import health, auth, patients, reports, verification, comparison, conflicts, doctor_intel, demo, audit
 
+logger = logging.getLogger("clinova")
+
 # Create database tables automatically
 Base.metadata.create_all(bind=engine)
 
-# Auto-migration check for SQLite schema evolution
+# Auto-migration check for SQLite schema evolution and indexes
 with engine.connect() as conn:
     try:
         from sqlalchemy import text
         conn.execute(text("ALTER TABLE users ADD COLUMN organization_name VARCHAR(255) DEFAULT 'MVSR Medical Center'"))
+    except Exception:
+        pass
+    try:
+        from sqlalchemy import text
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_patients_created_by_user_id ON patients (created_by_user_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_audit_logs_user_id ON audit_logs (user_id)"))
         conn.commit()
     except Exception:
-        pass  # Column already exists or table freshly created
+        pass
 
 def ensure_default_doctor():
     """Seeds a default demo clinician for zero-friction evaluation."""
@@ -36,7 +46,7 @@ def ensure_default_doctor():
             )
             db.add(demo_doctor)
             db.commit()
-            print("[Clinova] Default evaluation clinician initialized: doctor@clinova.health")
+            logger.info("[Clinova] Default evaluation clinician initialized: doctor@clinova.health")
     finally:
         db.close()
 
@@ -49,6 +59,32 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+# Global Exception Handler to prevent information leakage
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=getattr(exc, "headers", None)
+        )
+    logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An internal server error occurred. Please contact system support."}
+    )
 
 # Configure CORS
 app.add_middleware(

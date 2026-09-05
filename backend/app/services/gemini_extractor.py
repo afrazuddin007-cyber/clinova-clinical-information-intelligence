@@ -1,6 +1,9 @@
 import os
 import json
+import logging
 import re
+
+logger = logging.getLogger("clinova.extractor")
 from typing import Dict, Any, Optional, List, Tuple
 from google import genai
 from google.genai import types
@@ -389,7 +392,7 @@ def extract_structured_report(
                 )
 
         except Exception as e:
-            print(f"[Clinova Extraction] Gemini API warning: {e}. Falling back to deterministic text extractor.")
+            logger.warning(f"[Clinova Extraction] Gemini API warning: {e}. Falling back to deterministic text extractor.")
 
     # Deterministic fallback when Gemini is unavailable
     return _deterministic_fallback_extractor(doc_info, original_file_name)

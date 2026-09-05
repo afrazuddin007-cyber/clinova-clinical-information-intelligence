@@ -23,6 +23,9 @@ def compare_two_reports(
     if not rep_a or not rep_b:
         raise ValueError("One or both reports not found")
 
+    if rep_a.patient_id != rep_b.patient_id:
+        raise ValueError("Cannot compare reports from different patients")
+
     labs_a: List[ExtractedLabResult] = db.query(ExtractedLabResult).filter(
         ExtractedLabResult.report_id == report_a_id,
         ExtractedLabResult.verification_status != "REJECTED"

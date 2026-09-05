@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Patient, ExtractedLabResult } from '../../types';
 import { verificationApi } from '../../services/api';
 import { RangeStatusBadge } from '../common/RangeStatusBadge';
@@ -30,6 +30,7 @@ export const GlobalVerificationView: React.FC<GlobalVerificationViewProps> = ({
   const [pendingItems, setPendingItems] = useState<ExtractedLabResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const isMountedRef = useRef(true);
 
   // Edit State
   const [editingItem, setEditingItem] = useState<ExtractedLabResult | null>(null);
@@ -46,20 +47,31 @@ export const GlobalVerificationView: React.FC<GlobalVerificationViewProps> = ({
     setLoading(true);
     try {
       const data = await verificationApi.getPending();
-      setPendingItems(data);
+      if (isMountedRef.current) {
+        setPendingItems(data);
+      }
     } catch (err) {
       console.error('Failed to load pending verifications', err);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchPending();
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
-  const patientMap = new Map<string, Patient>();
-  patients.forEach((p) => patientMap.set(p.id, p));
+  const patientMap = useMemo(() => {
+    const map = new Map<string, Patient>();
+    patients.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [patients]);
 
   const handleVerify = async (labId: string) => {
     setActionLoading(true);

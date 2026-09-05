@@ -36,8 +36,11 @@ export const DoctorIntelligencePanel: React.FC<DoctorIntelligencePanelProps> = (
   const [conversation, setConversation] = useState<Array<{ role: 'user' | 'assistant'; content: string; citations?: any[] }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const currentPatientIdRef = useRef<string>(patientId);
+
   // Patient isolation: reset conversation state whenever patientId changes
   useEffect(() => {
+    currentPatientIdRef.current = patientId;
     setConversation([]);
     setQuery('');
     setLoading(false);
@@ -110,12 +113,16 @@ export const DoctorIntelligencePanel: React.FC<DoctorIntelligencePanelProps> = (
     if (!queryText.trim() || loading) return;
 
     const userMsg = queryText.trim();
+    const queryPatientId = patientId;
     setQuery('');
     setConversation((prev) => [...prev, { role: 'user', content: userMsg }]);
     setLoading(true);
 
     try {
       const response: DoctorQueryResponse = await intelligenceApi.ask(patientId, userMsg);
+      // Discard response if patient was switched while query was in-flight
+      if (currentPatientIdRef.current !== queryPatientId) return;
+
       setConversation((prev) => [
         ...prev,
         {
@@ -125,6 +132,8 @@ export const DoctorIntelligencePanel: React.FC<DoctorIntelligencePanelProps> = (
         },
       ]);
     } catch (err: any) {
+      if (currentPatientIdRef.current !== queryPatientId) return;
+
       setConversation((prev) => [
         ...prev,
         {
@@ -134,7 +143,9 @@ export const DoctorIntelligencePanel: React.FC<DoctorIntelligencePanelProps> = (
         },
       ]);
     } finally {
-      setLoading(false);
+      if (currentPatientIdRef.current === queryPatientId) {
+        setLoading(false);
+      }
     }
   };
 

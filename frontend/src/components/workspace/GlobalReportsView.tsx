@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Patient, MedicalReport } from '../../types';
 import { reportApi } from '../../services/api';
 import {
@@ -24,36 +24,50 @@ export const GlobalReportsView: React.FC<GlobalReportsViewProps> = ({
   const [reports, setReports] = useState<MedicalReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const isMountedRef = useRef(true);
 
   const fetchReports = async () => {
     setLoading(true);
     try {
       const data = await reportApi.listAll();
-      setReports(data);
+      if (isMountedRef.current) {
+        setReports(data);
+      }
     } catch (err) {
       console.error('Failed to load organization reports', err);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchReports();
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
-  const patientMap = new Map<string, Patient>();
-  patients.forEach((p) => patientMap.set(p.id, p));
+  const patientMap = useMemo(() => {
+    const map = new Map<string, Patient>();
+    patients.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [patients]);
 
-  const filteredReports = reports.filter((r) => {
+  const filteredReports = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    const patient = patientMap.get(r.patient_id);
-    return (
-      r.original_file_name.toLowerCase().includes(q) ||
-      (r.report_title && r.report_title.toLowerCase().includes(q)) ||
-      (r.facility_name && r.facility_name.toLowerCase().includes(q)) ||
-      (patient && (patient.full_name.toLowerCase().includes(q) || patient.patient_id.toLowerCase().includes(q)))
-    );
-  });
+    return reports.filter((r) => {
+      const patient = patientMap.get(r.patient_id);
+      return (
+        r.original_file_name.toLowerCase().includes(q) ||
+        (r.report_title && r.report_title.toLowerCase().includes(q)) ||
+        (r.facility_name && r.facility_name.toLowerCase().includes(q)) ||
+        (patient && (patient.full_name.toLowerCase().includes(q) || patient.patient_id.toLowerCase().includes(q)))
+      );
+    });
+  }, [reports, searchQuery, patientMap]);
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto p-4 sm:p-6">

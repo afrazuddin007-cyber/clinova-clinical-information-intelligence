@@ -37,22 +37,49 @@ def list_patients(
         Patient.created_by_user_id == current_user.id
     ).order_by(Patient.updated_at.desc()).all()
 
+    if not patients:
+        return []
+
+    from sqlalchemy import func
+
+    patient_ids = [p.id for p in patients]
+
+    # Bulk fetch report counts
+    rep_counts = dict(
+        db.query(MedicalReport.patient_id, func.count(MedicalReport.id))
+        .filter(MedicalReport.patient_id.in_(patient_ids))
+        .group_by(MedicalReport.patient_id)
+        .all()
+    )
+
+    # Bulk fetch pending verification counts
+    pending_counts = dict(
+        db.query(ExtractedLabResult.patient_id, func.count(ExtractedLabResult.id))
+        .filter(
+            ExtractedLabResult.patient_id.in_(patient_ids),
+            ExtractedLabResult.verification_status == "PENDING_VERIFICATION"
+        )
+        .group_by(ExtractedLabResult.patient_id)
+        .all()
+    )
+
+    # Bulk fetch active conflict counts
+    conflict_counts = dict(
+        db.query(Inconsistency.patient_id, func.count(Inconsistency.id))
+        .filter(
+            Inconsistency.patient_id.in_(patient_ids),
+            Inconsistency.resolution_status == "FLAGGED"
+        )
+        .group_by(Inconsistency.patient_id)
+        .all()
+    )
+
     result = []
     for p in patients:
-        rep_count = db.query(MedicalReport).filter(MedicalReport.patient_id == p.id).count()
-        pending_count = db.query(ExtractedLabResult).filter(
-            ExtractedLabResult.patient_id == p.id,
-            ExtractedLabResult.verification_status == "PENDING_VERIFICATION"
-        ).count()
-        conflicts_count = db.query(Inconsistency).filter(
-            Inconsistency.patient_id == p.id,
-            Inconsistency.resolution_status == "FLAGGED"
-        ).count()
-
         resp = PatientResponse.model_validate(p)
-        resp.report_count = rep_count
-        resp.pending_verifications_count = pending_count
-        resp.conflict_count = conflicts_count
+        resp.report_count = rep_counts.get(p.id, 0)
+        resp.pending_verifications_count = pending_counts.get(p.id, 0)
+        resp.conflict_count = conflict_counts.get(p.id, 0)
         result.append(resp)
 
     return result

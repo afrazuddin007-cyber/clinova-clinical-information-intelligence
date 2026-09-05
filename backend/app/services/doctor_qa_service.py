@@ -1,7 +1,10 @@
 import os
 import re
+import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
+
+logger = logging.getLogger("clinova.qa")
 from sqlalchemy.orm import Session
 from google import genai
 from google.genai import types
@@ -785,7 +788,7 @@ def handle_general_query(
                     disclaimer=RESPONSIBLE_AI_DISCLAIMER
                 )
         except Exception as e:
-            print(f"[Clinova QA] Gemini call exception: {e}")
+            logger.warning(f"[Clinova QA] Gemini call exception: {e}")
 
     # Deterministic fallback response for general queries without arbitrary truncation
     if labs:

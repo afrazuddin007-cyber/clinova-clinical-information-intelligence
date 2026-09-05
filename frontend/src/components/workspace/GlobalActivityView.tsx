@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Patient, AuditLogEntry } from '../../types';
 import { auditApi } from '../../services/api';
 import {
@@ -29,35 +29,49 @@ export const GlobalActivityView: React.FC<GlobalActivityViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
 
   const fetchLogs = async () => {
     setLoading(true);
     try {
       const data = await auditApi.getLogs();
-      setLogs(data);
+      if (isMountedRef.current) {
+        setLogs(data);
+      }
     } catch (err) {
       console.error('Failed to load audit logs', err);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchLogs();
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
-  const patientMap = new Map<string, Patient>();
-  patients.forEach((p) => patientMap.set(p.id, p));
+  const patientMap = useMemo(() => {
+    const map = new Map<string, Patient>();
+    patients.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [patients]);
 
-  const filteredLogs = logs.filter((log) => {
+  const filteredLogs = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return (
-      log.action.toLowerCase().includes(q) ||
-      (log.patient_name && log.patient_name.toLowerCase().includes(q)) ||
-      (log.entity_affected && log.entity_affected.toLowerCase().includes(q)) ||
-      (log.user_name && log.user_name.toLowerCase().includes(q))
-    );
-  });
+    return logs.filter((log) => {
+      return (
+        log.action.toLowerCase().includes(q) ||
+        (log.patient_name && log.patient_name.toLowerCase().includes(q)) ||
+        (log.entity_affected && log.entity_affected.toLowerCase().includes(q)) ||
+        (log.user_name && log.user_name.toLowerCase().includes(q))
+      );
+    });
+  }, [logs, searchQuery]);
 
   const getActionBadge = (action: string) => {
     switch (action) {

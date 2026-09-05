@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from ..core.database import get_db
 from ..core.security import get_current_user
 from ..models.db_models import User, ExtractedLabResult, ExtractedClinicalEntity, Patient
@@ -21,7 +21,9 @@ def get_all_pending_verifications(
     patient_ids = [p[0] for p in db.query(Patient.id).filter(Patient.created_by_user_id == current_user.id).all()]
     if not patient_ids:
         return []
-    labs = db.query(ExtractedLabResult).filter(
+    labs = db.query(ExtractedLabResult).options(
+        joinedload(ExtractedLabResult.report)
+    ).filter(
         ExtractedLabResult.patient_id.in_(patient_ids),
         ExtractedLabResult.verification_status == "PENDING_VERIFICATION"
     ).order_by(ExtractedLabResult.created_at.desc()).all()
@@ -44,6 +46,14 @@ def verify_lab_result(
     lab = db.query(ExtractedLabResult).filter(ExtractedLabResult.id == result_id).first()
     if not lab:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lab result not found")
+
+    # Verify patient ownership
+    patient = db.query(Patient).filter(
+        Patient.id == lab.patient_id,
+        Patient.created_by_user_id == current_user.id
+    ).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     lab.verification_status = "HUMAN_VERIFIED"
     lab.provenance_type = "HUMAN_VERIFIED"
@@ -83,6 +93,14 @@ def edit_lab_result(
     lab = db.query(ExtractedLabResult).filter(ExtractedLabResult.id == result_id).first()
     if not lab:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lab result not found")
+
+    # Verify patient ownership
+    patient = db.query(Patient).filter(
+        Patient.id == lab.patient_id,
+        Patient.created_by_user_id == current_user.id
+    ).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     # Store original AI extraction before edit if not already stored
     if not lab.original_ai_value:
@@ -145,6 +163,14 @@ def reject_lab_result(
     lab = db.query(ExtractedLabResult).filter(ExtractedLabResult.id == result_id).first()
     if not lab:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lab result not found")
+
+    # Verify patient ownership
+    patient = db.query(Patient).filter(
+        Patient.id == lab.patient_id,
+        Patient.created_by_user_id == current_user.id
+    ).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     lab.verification_status = "REJECTED"
     lab.human_override_notes = f"Rejected: {reject_in.rejection_reason}"

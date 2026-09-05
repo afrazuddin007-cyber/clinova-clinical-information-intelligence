@@ -47,6 +47,14 @@ def acknowledge_conflict(
     if not conflict:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conflict not found")
 
+    # Authorize clinician has access to this conflict's patient
+    patient = db.query(Patient).filter(
+        Patient.id == conflict.patient_id,
+        Patient.created_by_user_id == current_user.id
+    ).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
     conflict.resolution_status = "ACKNOWLEDGED"
     db.commit()
     db.refresh(conflict)

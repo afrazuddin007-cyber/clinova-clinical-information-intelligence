@@ -39,7 +39,7 @@ class Patient(Base):
     medical_history = Column(Text, nullable=True)
     additional_notes = Column(Text, nullable=True)
 
-    created_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    created_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -163,7 +163,7 @@ class AuditLog(Base):
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     patient_id = Column(String(36), nullable=True, index=True)
-    user_id = Column(String(36), nullable=False)
+    user_id = Column(String(36), nullable=False, index=True)
     action = Column(String(100), nullable=False)  # CREATE_PATIENT, UPLOAD_REPORT, VERIFY_ITEM, EDIT_ITEM, REJECT_ITEM
     entity_affected = Column(String(100), nullable=True)
     details = Column(JSON, nullable=True)

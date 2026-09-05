@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from ..core.database import get_db
 from ..core.security import get_current_user
-from ..models.db_models import User, Patient
+from ..models.db_models import User, Patient, MedicalReport
 from ..models.schemas import ReportComparisonResponse
 from ..services.comparison_service import compare_two_reports
 from ..services.audit_service import log_audit_event
@@ -27,6 +27,14 @@ def compare_patient_reports(
     ).first()
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    rep_a = db.query(MedicalReport).filter(MedicalReport.id == report_a, MedicalReport.patient_id == patient.id).first()
+    rep_b = db.query(MedicalReport).filter(MedicalReport.id == report_b, MedicalReport.patient_id == patient.id).first()
+    if not rep_a or not rep_b:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="One or both reports do not belong to the specified patient or do not exist."
+        )
 
     try:
         comparison_res = compare_two_reports(report_a_id=report_a, report_b_id=report_b, db=db)

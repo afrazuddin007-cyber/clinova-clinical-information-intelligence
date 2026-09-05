@@ -28,24 +28,6 @@ export const ReportComparisonView: React.FC<ReportComparisonViewProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const fetchComparison = async () => {
-    if (!reportAId || !reportBId || reportAId === reportBId) {
-      setComparisonData(null);
-      return;
-    }
-
-    setLoading(true);
-    setErrorMessage(null);
-    try {
-      const data = await comparisonApi.compare(patientId, reportAId, reportBId);
-      setComparisonData(data);
-    } catch (err: any) {
-      setErrorMessage(err.response?.data?.detail || 'Failed to compare reports.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (reports.length >= 2 && (!reportAId || !reportBId || reportAId === reportBId)) {
       setReportAId(reports[1].id);
@@ -54,10 +36,37 @@ export const ReportComparisonView: React.FC<ReportComparisonViewProps> = ({
   }, [reports]);
 
   useEffect(() => {
-    if (reportAId && reportBId && reportAId !== reportBId) {
-      fetchComparison();
+    let isCurrent = true;
+
+    if (!reportAId || !reportBId || reportAId === reportBId) {
+      setComparisonData(null);
+      return;
     }
-  }, [reportAId, reportBId]);
+
+    setLoading(true);
+    setErrorMessage(null);
+
+    comparisonApi.compare(patientId, reportAId, reportBId)
+      .then((data) => {
+        if (isCurrent) {
+          setComparisonData(data);
+        }
+      })
+      .catch((err: any) => {
+        if (isCurrent) {
+          setErrorMessage(err.response?.data?.detail || 'Failed to compare reports.');
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [patientId, reportAId, reportBId]);
 
   if (reports.length < 2) {
     return (

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from ..core.database import get_db
 from ..core.security import get_current_user
 from ..core.config import settings
@@ -86,12 +86,20 @@ async def upload_and_process_report(
     file_hash = hashlib.sha256(content).hexdigest()
 
     # 4. Save securely to disk with UUID filename (prevent path traversal)
-    ext = Path(file.filename or "report.pdf").suffix.lower()
-    if not ext:
+    clean_filename = Path(file.filename or "report.pdf").name
+    ext = Path(clean_filename).suffix.lower()
+    if not ext or ext not in [".pdf", ".png", ".jpg", ".jpeg"]:
         ext = ".pdf" if detected_mime == "application/pdf" else ".png"
 
     safe_stored_name = f"{uuid.uuid4()}{ext}"
-    safe_path = Path(settings.UPLOAD_DIR) / safe_stored_name
+    upload_root = Path(settings.UPLOAD_DIR).resolve()
+    safe_path = (upload_root / safe_stored_name).resolve()
+
+    if not str(safe_path).startswith(str(upload_root)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file storage destination."
+        )
 
     with open(safe_path, "wb") as f:
         f.write(content)
@@ -225,7 +233,10 @@ def list_patient_reports(
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
 
-    reports = db.query(MedicalReport).filter(
+    reports = db.query(MedicalReport).options(
+        selectinload(MedicalReport.lab_results),
+        selectinload(MedicalReport.clinical_entities)
+    ).filter(
         MedicalReport.patient_id == patient.id
     ).order_by(MedicalReport.report_date.desc()).all()
 
@@ -246,7 +257,10 @@ def list_all_organization_reports(
     patient_ids = [p[0] for p in db.query(Patient.id).filter(Patient.created_by_user_id == current_user.id).all()]
     if not patient_ids:
         return []
-    reports = db.query(MedicalReport).filter(
+    reports = db.query(MedicalReport).options(
+        selectinload(MedicalReport.lab_results),
+        selectinload(MedicalReport.clinical_entities)
+    ).filter(
         MedicalReport.patient_id.in_(patient_ids)
     ).order_by(MedicalReport.report_date.desc()).all()
     res = []
@@ -276,13 +290,17 @@ def get_report_file(
     if not patient:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    if not os.path.exists(report.storage_path):
+    resolved_path = Path(report.storage_path).resolve()
+    upload_root = Path(settings.UPLOAD_DIR).resolve()
+    if not str(resolved_path).startswith(str(upload_root)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file path")
+    if not resolved_path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Original document file not found on server")
 
     return FileResponse(
-        path=report.storage_path,
+        path=str(resolved_path),
         media_type=report.file_type,
-        filename=report.original_file_name
+        filename=Path(report.original_file_name).name
     )
 
 @router.get("/patients/{patient_id}/labs", response_model=List[ExtractedLabResultResponse])
@@ -299,7 +317,9 @@ def get_all_patient_labs(
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
 
-    labs = db.query(ExtractedLabResult).filter(
+    labs = db.query(ExtractedLabResult).options(
+        joinedload(ExtractedLabResult.report)
+    ).filter(
         ExtractedLabResult.patient_id == patient.id
     ).order_by(ExtractedLabResult.created_at.desc()).all()
 
