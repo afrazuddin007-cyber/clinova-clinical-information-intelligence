@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.database import SessionLocal
@@ -117,3 +117,34 @@ def test_file_path_traversal_prevention():
         assert "Invalid file path" in res.json()["detail"]
     finally:
         db.close()
+
+def test_production_jwt_secret_fails_fast_when_missing():
+    """Verify production fails fast if JWT_SECRET is missing or default."""
+    import subprocess
+    import sys
+
+    code = """
+import os, sys
+os.environ['APP_ENV'] = 'production'
+os.environ['JWT_SECRET'] = ''
+try:
+    import app.core.config
+    print('SHOULD_HAVE_FAILED')
+except RuntimeError as e:
+    print('CAUGHT_RUNTIME_ERROR')
+"""
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd="backend")
+    assert "CAUGHT_RUNTIME_ERROR" in result.stdout
+
+def test_cors_origins_configuration():
+    """Verify CORS_ORIGINS comma-separated parsing."""
+    from app.core.config import Settings
+    s = Settings(
+        CORS_ORIGINS="https://example.onrender.com, https://clinova.health",
+        APP_ENV="production",
+        JWT_SECRET="dummy_secret_for_test_1234567890"
+    )
+    origins = s.cors_origins_list
+    assert "https://example.onrender.com" in origins
+    assert "https://clinova.health" in origins
+

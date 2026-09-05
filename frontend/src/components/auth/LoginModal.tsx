@@ -196,18 +196,18 @@ export const LoginModal: React.FC = () => {
           </form>
         </div>
 
-        {/* Discreet Demo Footer */}
+        {/* Discreet Synthetic Evaluation Account Footer */}
         <div className="p-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-            <span>Pre-configured clinician account available</span>
+            <span>Synthetic evaluation account (hackathon demo)</span>
           </div>
           <button
             type="button"
             onClick={handleFillDemoCredentials}
             className="text-slate-800 font-semibold hover:underline cursor-pointer"
           >
-            Use Demo Login
+            Fill Demo Login
           </button>
         </div>
       </div>

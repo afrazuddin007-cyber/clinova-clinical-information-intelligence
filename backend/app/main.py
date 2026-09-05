@@ -1,4 +1,3 @@
-import os
 import logging
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
@@ -33,7 +32,7 @@ with engine.connect() as conn:
         pass
 
 def ensure_default_doctor():
-    """Seeds a default demo clinician for zero-friction evaluation."""
+    """Seeds a synthetic demo/evaluation clinician for zero-friction evaluation."""
     db = SessionLocal()
     try:
         existing = db.query(User).filter(User.email == "doctor@clinova.health").first()
@@ -41,12 +40,13 @@ def ensure_default_doctor():
             demo_doctor = User(
                 email="doctor@clinova.health",
                 hashed_password=get_password_hash("clinova2026"),
-                full_name="Dr. Sarah Chen, MD",
-                role="doctor"
+                full_name="Dr. Sarah Chen, MD (Evaluation Account)",
+                role="doctor",
+                organization_name="Clinova Evaluation Health System"
             )
             db.add(demo_doctor)
             db.commit()
-            logger.info("[Clinova] Default evaluation clinician initialized: doctor@clinova.health")
+            logger.info("[Clinova] Synthetic demo/evaluation account initialized: doctor@clinova.health")
     finally:
         db.close()
 
@@ -89,7 +89,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Open for development & Cloud Run
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
