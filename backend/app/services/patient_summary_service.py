@@ -85,7 +85,7 @@ def generate_patient_summary(patient_id: str, db: Session) -> PatientSummaryResp
                 f"Documented Conditions: {', '.join(unique_conditions) or patient.existing_conditions or 'None'}\n"
                 f"Active Symptoms / Complaints: {', '.join(unique_symptoms) or patient.symptoms or 'None'}\n"
                 f"Total Reports Uploaded: {len(reports)}\n"
-                f"Tests with Low/High status: {', '.join([f'{l.test_name} ({l.raw_value} {l.unit or ''}, status: {l.range_status})' for l in abnormal_labs]) or 'All within normal reference ranges'}\n"
+                f"{l.test_name} ({l.raw_value} {l.unit or ''}, status: {l.range_status})"
                 f"Documented Medications: {', '.join(unique_med_strs) or patient.current_medications or 'None'}\n"
                 f"Documented Allergies: {', '.join(unique_allergies) or patient.allergies or 'None'}"
             )
